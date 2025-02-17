@@ -49,7 +49,6 @@ class LaporanController extends Controller
     public function store(Request $request)
     {
         try {
-            // Validasi data input
             $request->validate([
                 'jenis_laporan' => 'required|string',
                 'alamat' => 'required|string',
@@ -59,38 +58,37 @@ class LaporanController extends Controller
                 'foto3' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             ]);
 
-            // Simpan data laporan ke database
             $laporan = new Laporan();
             $laporan->jenis_laporan = $request->jenis_laporan;
             $laporan->alamat = $request->alamat;
             $laporan->keterangan = $request->keterangan;
             $laporan->save();
 
-            // Jika ada foto, simpan ke storage
             if ($request->hasFile('foto1')) {
-                $laporan->foto1 = $request->file('foto1')->store('laporan');
+                $laporan->foto1 = $request->file('foto1')->store('laporan', 'public');
             }
             if ($request->hasFile('foto2')) {
-                $laporan->foto2 = $request->file('foto2')->store('laporan');
+                $laporan->foto2 = $request->file('foto2')->store('laporan', 'public');
             }
             if ($request->hasFile('foto3')) {
-                $laporan->foto3 = $request->file('foto3')->store('laporan');
+                $laporan->foto3 = $request->file('foto3')->store('laporan', 'public');
             }
             $laporan->save();
 
-            // Logging sukses
             Log::info('Laporan berhasil disimpan:', $laporan->toArray());
 
-            // Response sukses ke frontend (Flutter / Vue / React)
-            return response()->json(['message' => 'Laporan berhasil dikirim!', 'data' => $laporan], 200);
+            return response()->json([
+                'message' => 'Laporan berhasil dikirim!',
+                'data' => $laporan
+            ], 200);
 
         } catch (Exception $e) {
-            // Logging error
             Log::error('Gagal mengirim laporan:', ['error' => $e->getMessage()]);
 
-            // Response error ke frontend
-            return response()->json(['message' => 'Gagal mengirim laporan', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'message' => 'Gagal mengirim laporan',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
-
 }
