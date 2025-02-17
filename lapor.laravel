@@ -1,0 +1,96 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Laporan;
+use Illuminate\Support\Facades\Log;
+use Exception;
+
+class LaporanController extends Controller
+{
+    public function daftar(Request $request)
+    {
+        $query = Laporan::query();
+
+        // Filter berdasarkan status jika ada
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $laporan = $query->get();
+        return view('PengaduanSuperAdmin.DaftarLaporan', compact('laporan'));
+    }
+
+    public function detail($id)
+    {
+        $laporan = Laporan::findOrFail($id);
+        return view('PengaduanSuperAdmin.DetailLaporan', compact('laporan'));
+    }
+
+    public function updateStatus(Request $request, $id, $status)
+    {
+        if (!in_array($status, ['diproses', 'diterima', 'ditolak'])) {
+            return back()->with('error', 'Status tidak valid.');
+        }
+
+        $laporan = Laporan::findOrFail($id);
+        $laporan->status = $status;
+        $laporan->save();
+
+        return redirect()->route('Laporan.daftar')->with('success', 'Status laporan berhasil diperbarui.');
+    }
+
+    public function rekap()
+    {
+        return view('PengaduanSuperAdmin.RekapLaporan');
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            // Validasi data input
+            $request->validate([
+                'jenis_laporan' => 'required|string',
+                'alamat' => 'required|string',
+                'keterangan' => 'nullable|string',
+                'foto1' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+                'foto2' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+                'foto3' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            ]);
+
+            // Simpan data laporan ke database
+            $laporan = new Laporan();
+            $laporan->jenis_laporan = $request->jenis_laporan;
+            $laporan->alamat = $request->alamat;
+            $laporan->keterangan = $request->keterangan;
+            $laporan->save();
+
+            // Jika ada foto, simpan ke storage
+            if ($request->hasFile('foto1')) {
+                $laporan->foto1 = $request->file('foto1')->store('laporan');
+            }
+            if ($request->hasFile('foto2')) {
+                $laporan->foto2 = $request->file('foto2')->store('laporan');
+            }
+            if ($request->hasFile('foto3')) {
+                $laporan->foto3 = $request->file('foto3')->store('laporan');
+            }
+            $laporan->save();
+
+            // Logging sukses
+            Log::info('Laporan berhasil disimpan:', $laporan->toArray());
+
+            // Response sukses ke frontend (Flutter / Vue / React)
+            return response()->json(['message' => 'Laporan berhasil dikirim!', 'data' => $laporan], 200);
+
+        } catch (Exception $e) {
+            // Logging error
+            Log::error('Gagal mengirim laporan:', ['error' => $e->getMessage()]);
+
+            // Response error ke frontend
+            return response()->json(['message' => 'Gagal mengirim laporan', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+}
