@@ -1,0 +1,182 @@
+class BuatLaporanPage extends StatefulWidget {
+  @override
+  _BuatLaporanPageState createState() => _BuatLaporanPageState();
+}
+
+class _BuatLaporanPageState extends State<BuatLaporanPage> {
+  final TextEditingController jenisLaporanController = TextEditingController();
+  final TextEditingController alamatController = TextEditingController();
+  final TextEditingController keteranganController = TextEditingController();
+
+  final ImagePicker _picker = ImagePicker();
+
+  File? foto1;
+  File? foto2;
+  File? foto3;
+
+  Future<void> pickImage(int index) async {
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        File selectedImage = File(pickedFile.path);
+        if (index == 1) foto1 = selectedImage;
+        if (index == 2) foto2 = selectedImage;
+        if (index == 3) foto3 = selectedImage;
+      });
+    }
+  }
+
+  Future<void> _submitReport() async {
+    if (jenisLaporanController.text.isEmpty || alamatController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Harap isi semua kolom yang diperlukan!")),
+      );
+      return;
+    }
+
+    var uri = Uri.parse("http://10.0.2.2:8000/api/laporan");
+    var request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({"Content-Type": "multipart/form-data"})
+      ..fields['jenis_laporan'] = jenisLaporanController.text
+      ..fields['alamat'] = alamatController.text
+      ..fields['keterangan'] = keteranganController.text;
+
+    try {
+      if (foto1 != null) {
+        request.files
+            .add(await http.MultipartFile.fromPath('foto1', foto1!.path));
+      }
+      if (foto2 != null) {
+        request.files
+            .add(await http.MultipartFile.fromPath('foto2', foto2!.path));
+      }
+      if (foto3 != null) {
+        request.files
+            .add(await http.MultipartFile.fromPath('foto3', foto3!.path));
+      }
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+
+      print("Response: $responseBody");
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Laporan berhasil dikirim!")),
+        );
+
+        jenisLaporanController.clear();
+        alamatController.clear();
+        keteranganController.clear();
+        setState(() {
+          foto1 = null;
+          foto2 = null;
+          foto3 = null;
+        });
+      } else {
+        print("Gagal mengirim laporan: ${response.statusCode}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text("Gagal mengirim laporan! Status: ${response.statusCode}")),
+        );
+      }
+    } catch (e) {
+      print("Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Terjadi kesalahan: $e")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Buat Laporan'),
+        backgroundColor: Colors.teal,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTextField(
+                  jenisLaporanController, 'Jenis Laporan', 'Masukkan jenis laporan'),
+              const SizedBox(height: 16),
+              const Text('Foto Dokumentasi:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildPhotoBox(foto1, 1),
+                  _buildPhotoBox(foto2, 2),
+                  _buildPhotoBox(foto3, 3),
+                ],
+              ),
+              const SizedBox(height: 32),
+              _buildTextField(alamatController, 'Alamat',
+                  'Masukkan alamat lokasi kejadian'),
+              const SizedBox(height: 16),
+              _buildTextField(keteranganController, 'Keterangan',
+                  'Masukkan keterangan tambahan',
+                  maxLines: 3),
+              const SizedBox(height: 24),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _submitReport,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                  ),
+                  child: const Text('Kirim Laporan'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label,
+      String hint, {int maxLines = 1}) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      maxLines: maxLines,
+    );
+  }
+
+  Widget _buildPhotoBox(File? imageFile, int index) {
+    return GestureDetector(
+      onTap: () => pickImage(index),
+      child: Container(
+        height: 100,
+        width: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+          image: imageFile != null
+              ? DecorationImage(image: FileImage(imageFile), fit: BoxFit.cover)
+              : null,
+        ),
+        child: imageFile == null
+            ? const Icon(Icons.image, size: 40, color: Colors.grey)
+            : null,
+      ),
+    );
+  }
+}
